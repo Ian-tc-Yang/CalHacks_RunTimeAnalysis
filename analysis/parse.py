@@ -39,7 +39,7 @@ def parse_text(text):
     return parsed_tree
 
 # Example input text
-text = "for (int row =1;row<=3;row++){while (int col = 1; col <= 5; col = g(col+1)+f(i)) { System.out.print(\"*\");            }            System.out.println()        }    }"
+text = "for (int row =1;row<=3;row++){for (int col = 1; col <= 5; col = g(col+1)+f(i)) { System.out.print(\"*\");            }            System.out.println()        }    }"
 
 # Parse the input text recursively
 parsed_output = parse_text(text)
