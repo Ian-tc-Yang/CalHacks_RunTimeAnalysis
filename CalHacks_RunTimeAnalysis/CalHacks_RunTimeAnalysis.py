@@ -1,7 +1,6 @@
 """Welcome to Reflex! This file outlines the steps to create a basic app."""
 
 import reflex as rx
-from .Check import check_code
 import google.generativeai as genai
 import os
 
@@ -9,21 +8,36 @@ import os
 from reflex.style import set_color_mode, color_mode
 
 class State(rx.State):
+    is_recursion: bool = False
     code_input: str = ''
     var_input: str = ''
     malicious_outputer: str = ''
+    adjusted_code: str = ''
     outputer: str = ''
     answer: str = ''
-    def call_gemini(self):
-        #return check_code(x)
-        self.answered()
-        self.malicious_outputer = self.answer
 
-    def answered(self):
+    malicious_o_meter_prompt = "Respond with 'SAFE' if the code is safe and 'EVIL' if it is malicious if you are unsure respond with 'idk'. DO NOT RESPOND WITH ANYTHING ELSE. THOSE 3 CHOICES ONLY "
+    recursion_translate_prompt = "Translate this code from recursion to iteration, ONLY INCLUDE THE CODE IN YOUR RESPONSE"
+
+    def change_checked(self, checked: bool):
+        """Change the switch checked var."""
+        self.is_recursion = checked
+    def set_end(self, value: bool):
+        self.is_recursion = value
+    def call_gemini(self):
+        #check if Malicious
+        self.answered(self.malicious_o_meter_prompt)
+        self.malicious_outputer = self.answer
+        self.answer = ''
+        #translate to recursion
+        if self.is_recursion: self.answered(self.recursion_translate_prompt)
+        self.adjusted_code = self.answer
+
+    def answered(self, prompt):
+        os.environ['API_KEY'] = 'AIzaSyCOoBC0c2-raJ_R7S-X0AB6KtORGtEQwrI'
         genai.configure(api_key=os.environ["API_KEY"])
         model = genai.GenerativeModel("gemini-1.5-flash")   
-        # Our chatbot has some brains now!
-        prompt = "Respond with 'SAFE' if the code is safe and 'EVIL' if it is malicious if you are unsure respond with 'idk'. DO NOT RESPOND WITH ANYTHING ELSE. THOSE 3 CHOICES ONLY "
+        # Our chatbot has some brains now! 
         prompt += self.code_input  # Concatenate the question to the prompt
 
         # Generate content without streaming
@@ -47,7 +61,6 @@ class State(rx.State):
         else:
             self.answer = "No valid response received."
         # Clear the question input.
-        self.code_input = ""
         print(self.answer)
         return self.answer  # Yield to clear the frontend input after getting the answer
         
@@ -68,13 +81,20 @@ def title() ->rx.Component:
 def input() ->rx.Component:
     #Text Box and Submit Button
     return rx.vstack(
-                rx.input(placeholder = "Insert Variable Here...", 
-                         radius="medium", 
-                         max_length=10,
-                         required=True,
-                         value = State.var_input,
-                         on_change = State.set_var_input,
-                         ),
+                rx.hstack(
+                    rx.text("Is Recursion?", size = '4'),
+                    rx.box(switch_intro(), width = ("80px")),
+                    rx.input(placeholder = "Insert Variable Here...", 
+                            radius="medium", 
+                            max_length=10,
+                            required=True,
+                            value = State.var_input,
+                            on_change = State.set_var_input,
+                            ), 
+                            width = "100%",
+                            justify="end"),
+                    
+                
                 rx.text_area(placeholder="Insert Code Here...", 
                              radius="full", 
                              max_length = 1000, 
@@ -97,7 +117,7 @@ def output() ->rx.Component:
             rx.text(State.outputer),
             rx.text("Malicious-o-Meter:", size='6'),
             rx.text(State.malicious_outputer),
-
+            rx.text(State.adjusted_code),
             spacing='4',
             width = "50%",
     )
@@ -129,10 +149,18 @@ def dark_mode_toggle() -> rx.Component:
         radius="large",
         value=color_mode,
     )
+def switch_intro():
+    return rx.center(
+        rx.switch( 
+                size = '6',
+                checked=State.is_recursion,
+                on_change=State.change_checked),
+        rx.badge(State.is_recursion),
+    )
 
 def index():
     return rx.container(
-        rx.vstack(
+        rx.vstack(  
         title(),
         rx.hstack(
             output(),
